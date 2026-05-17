@@ -28,6 +28,7 @@ model = init_chat_model(
 )
 
 # checkpoint
+os.makedirs("./db", exist_ok=True)
 checkpointer = SqliteSaver(sqlite3.connect("./db/personal_agent.db", check_same_thread=False))
 
 # 建表

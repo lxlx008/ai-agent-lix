@@ -3,6 +3,11 @@
   command = "echo 'Static files already built'"
 
 [[redirects]]
+  from = "/api/*"
+  to = "https://web-production-2ad77.up.railway.app/api/:splat"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

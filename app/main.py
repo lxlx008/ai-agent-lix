@@ -1,7 +1,6 @@
 import os
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import chat
@@ -30,19 +29,6 @@ app.include_router(oss.router, prefix="/api/v1", tags=["申请上传签名url"])
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
     app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
-
-@app.get("/{path:path}", include_in_schema=False)
-async def serve_frontend(path: str):
-    if path.startswith("api/"):
-        from fastapi.responses import JSONResponse
-        return JSONResponse({"error": "Not Found"}, status_code=404)
-    file_path = os.path.join(static_dir, path)
-    if os.path.isfile(file_path):
-        return FileResponse(file_path)
-    index_path = os.path.join(static_dir, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    return {"message": "你的独家私厨上线了~", "status": "ok"}
 
 if __name__ == "__main__":
     import uvicorn

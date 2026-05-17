@@ -4,9 +4,6 @@
     "builder": "NIXPACKS",
     "nixpacksPlan": {
       "phases": {
-        "setup": {
-          "nixpacksDeps": ["python3", "python3Packages.pip", "cargo", "rustc"]
-        },
         "install": {
           "cmds": ["pip install -r requirements.txt"]
         }

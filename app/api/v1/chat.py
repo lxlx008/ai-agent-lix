@@ -10,8 +10,12 @@ router = APIRouter()
 @router.post("/chat/stream")
 async def chat_endpoint(request: ChatRequest):
     """流式对话"""
-    return StreamingResponse(search_recipes(request.message, request.image_url, request.thread_id),
-                             media_type="text/event-stream")
+    def stream_generator():
+        for chunk in search_recipes(request.message, request.image_url, request.thread_id):
+            # 输出正确的 SSE 格式
+            yield f"data: {chunk}\n\n"
+    
+    return StreamingResponse(stream_generator(), media_type="text/event-stream")
 
 
 @router.get("/chat/messages")

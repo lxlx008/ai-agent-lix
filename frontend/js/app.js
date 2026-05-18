@@ -9,16 +9,16 @@ class App {
         this.bindEvents();
         this.loadThreads();
         
-        // 页面加载时检查历史会话
-        const threads = Storage.getThreads();
-        if (threads.length > 0) {
-            const latestThread = threads.reduce((latest, t) => 
-                t.updated_at > latest.updated_at ? t : latest
-            );
-            this.switchThread(latestThread.thread_id, latestThread.title);
-        } else {
-            this.createNewThread();
-        }
+        // 页面加载时检查服务器上的历史会话
+        this.loadServerThreads().then(threads => {
+            if (threads.length > 0) {
+                // 使用最新的会话
+                const latestThread = threads[0];
+                this.switchThread(latestThread.thread_id, latestThread.title);
+            } else {
+                this.createNewThread();
+            }
+        });
     }
 
     bindEvents() {
@@ -46,7 +46,7 @@ class App {
         clearChatBtn.addEventListener('click', () => {
             if (this.currentThreadId && confirm('确定要清空当前会话吗？')) {
                 API.deleteThread(this.currentThreadId).then(() => {
-                    Storage.deleteThread(this.currentThreadId);
+                    this.loadServerThreads();
                     this.createNewThread();
                 });
             }
@@ -101,15 +101,28 @@ class App {
         
         try {
             await API.deleteThread(threadId);
-            Storage.deleteThread(threadId);
+            this.loadServerThreads();
             
             if (this.currentThreadId === threadId) {
                 this.createNewThread();
-            } else {
-                this.loadThreads();
             }
         } catch (error) {
             console.error('删除会话失败:', error);
+        }
+    }
+
+    async loadServerThreads() {
+        try {
+            const threads = await API.getThreads();
+            // 更新本地存储以保持一致
+            threads.forEach(thread => {
+                Storage.saveThread(thread.thread_id, thread.title);
+            });
+            this.loadThreads();
+            return threads;
+        } catch (error) {
+            console.error('获取服务器会话列表失败:', error);
+            return [];
         }
     }
 
@@ -155,20 +168,8 @@ class App {
 
             loadingElement.remove();
             
-            // 保存会话
-            const threads = Storage.getThreads();
-            const existingThread = threads.find(t => t.thread_id === this.currentThreadId);
-            
-            if (!existingThread) {
-                const title = message.length > 30 ? message.substring(0, 30) + '...' : message;
-                this.currentThreadTitle = title;
-                UI.updateThreadTitle(title);
-                Storage.saveThread(this.currentThreadId, title);
-            } else {
-                Storage.saveThread(this.currentThreadId, this.currentThreadTitle);
-            }
-            
-            this.loadThreads();
+            // 刷新会话列表，从服务器获取最新数据
+            this.loadServerThreads();
         } catch (error) {
             console.error('发送消息失败:', error);
             textElement.textContent = '抱歉，发生了错误，请重试。';

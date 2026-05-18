@@ -1,8 +1,6 @@
-const API_BASE_URL = 'https://web-production-2ad77.up.railway.app/api';
-
 class API {
     static async sendMessage(message, threadId) {
-        const response = await fetch(`${API_BASE_URL}/v1/chat/stream`, {
+        const response = await fetch(`/api/v1/chat/stream`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -22,14 +20,14 @@ class API {
     }
 
     static async getMessages(threadId) {
-        const response = await fetch(`${API_BASE_URL}/v1/chat/messages?thread_id=${threadId}`);
+        const response = await fetch(`/api/v1/chat/messages?thread_id=${threadId}`);
         const data = await response.json();
         return data.messages || [];
     }
 
     static async getThreads() {
         try {
-            const response = await fetch(`${API_BASE_URL}/v1/chat/threads`);
+            const response = await fetch(`/api/v1/chat/threads`);
             const data = await response.json();
             return data.threads || [];
         } catch (error) {
@@ -39,7 +37,7 @@ class API {
     }
 
     static async deleteThread(threadId) {
-        await fetch(`${API_BASE_URL}/v1/chat/messages?thread_id=${threadId}`, {
+        await fetch(`/api/v1/chat/messages?thread_id=${threadId}`, {
             method: 'DELETE'
         });
     }

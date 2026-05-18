@@ -1,0 +1,6 @@
+name = "ai-agent-lix"
+type = "pages"
+
+[build]
+command = ""
+publish = "app/static"

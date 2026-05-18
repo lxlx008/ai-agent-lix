@@ -32,7 +32,7 @@
             
             <!-- 会话列表 -->
             <div id="threads-list" class="flex-1 overflow-y-auto p-2 scrollbar-hide">
-                <!-- 会话项将通过JS动态添加 -->
+                <!-- 会话项将通过 JS 动态添加 -->
             </div>
         </div>
 
@@ -49,43 +49,21 @@
                 </button>
             </div>
 
-            <!-- 消息区域 -->
-            <div id="messages-container" class="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-hide">
-                <!-- 欢迎消息 -->
-                <div class="flex justify-center py-8">
-                    <div class="text-center max-w-md">
-                        <div class="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center">
-                            <span class="material-icons text-white text-3xl">smart_toy</span>
-                        </div>
-                        <h3 class="text-xl font-semibold text-gray-800 mb-2">你好呀！我是你的 AI 私人助手</h3>
-                        <p class="text-gray-600">很高兴为你服务！请问有什么我可以帮助你的吗？</p>
-                        <div class="mt-4 text-left bg-blue-50 rounded-xl p-4">
-                            <p class="text-sm text-gray-700 mb-2"><span class="font-semibold">💡 我可以帮你解答问题、提供建议</span></p>
-                            <p class="text-sm text-gray-600 mb-2"><span class="font-semibold">🔍 搜索最新信息和资讯</span></p>
-                            <p class="text-sm text-gray-600 mb-2"><span class="font-semibold">📝 提供创意和灵感</span></p>
-                            <p class="text-sm text-gray-600"><span class="font-semibold">💬 陪你聊天交流</span></p>
-                        </div>
-                    </div>
-                </div>
+            <!-- 消息容器 -->
+            <div id="messages-container" class="flex-1 overflow-y-auto p-6 scrollbar-hide">
+                <!-- 消息将通过 JS 动态添加 -->
             </div>
 
             <!-- 输入区域 -->
             <div class="p-4 bg-white/80 backdrop-blur-sm border-t border-white/50">
-                <div class="max-w-3xl mx-auto flex items-end gap-3">
-                    <button id="upload-btn" class="p-3 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-xl transition-colors" title="上传图片">
-                        <span class="material-icons text-lg">attach_file</span>
+                <div class="max-w-4xl mx-auto flex gap-3">
+                    <input type="file" id="file-input" class="hidden" accept="image/*">
+                    <button id="upload-btn" class="p-3 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-colors" title="上传图片">
+                        <span class="material-icons">attach_file</span>
                     </button>
-                    <input type="file" id="file-input" accept="image/*" class="hidden">
-                    <div class="flex-1 relative">
-                        <input 
-                            id="message-input" 
-                            type="text" 
-                            placeholder="有什么我可以帮助你的吗？..." 
-                            class="w-full px-4 py-3 pr-12 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
-                        >
-                    </div>
-                    <button id="send-btn" disabled class="p-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl transition-colors" title="发送">
-                        <span class="material-icons text-lg">send</span>
+                    <input type="text" id="message-input" placeholder="有什么我可以帮助你的吗？..." class="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <button id="send-btn" class="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <span class="material-icons">send</span>
                     </button>
                 </div>
             </div>
@@ -93,8 +71,11 @@
     </div>
 
     <script>
-        // 当前会话 ID
+        // 全局变量
         let currentThreadId = null;
+        const API_BASE_URL = 'https://web-production-2ad77.up.railway.app/api';
+
+        // DOM 元素
         const messagesContainer = document.getElementById('messages-container');
         const messageInput = document.getElementById('message-input');
         const sendBtn = document.getElementById('send-btn');
@@ -112,12 +93,17 @@
 
         // 保存会话到本地存储
         function saveThread(threadId, title) {
+            if (!threadId || !title) return;
+            
             let threads = JSON.parse(localStorage.getItem('chat_threads') || '[]');
             const existingIndex = threads.findIndex(t => t.thread_id === threadId);
+            
             if (existingIndex >= 0) {
+                // 更新现有会话
                 threads[existingIndex].title = title;
                 threads[existingIndex].updated_at = Date.now();
             } else {
+                // 添加新会话
                 threads.unshift({
                     thread_id: threadId,
                     title: title,
@@ -125,80 +111,20 @@
                     updated_at: Date.now()
                 });
             }
+            
             localStorage.setItem('chat_threads', JSON.stringify(threads));
         }
 
-        // 获取所有会话
+        // 从本地存储获取所有会话
         function getThreads() {
             return JSON.parse(localStorage.getItem('chat_threads') || '[]');
         }
 
-        // 更新会话标题（根据第一条消息）
-        function updateThreadTitle(threadId, firstMessage) {
-            const title = firstMessage.length > 30 ? firstMessage.substring(0, 30) + '...' : firstMessage;
-            currentThreadTitle.textContent = title;
-            saveThread(threadId, title);
-            loadThreads();
-        }
-
-        // 创建新会话
-        function createNewThread() {
-            currentThreadId = generateThreadId();
-            currentThreadTitle.textContent = '新对话';
-            // 不保存到本地存储，只有发送消息后才保存
-            messagesContainer.innerHTML = `
-                <div class="flex justify-center py-8">
-                    <div class="text-center max-w-md">
-                        <div class="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center">
-                            <span class="material-icons text-white text-3xl">smart_toy</span>
-                        </div>
-                        <h3 class="text-xl font-semibold text-gray-800 mb-2">你好呀！我是你的 AI 私人助手</h3>
-                        <p class="text-gray-600">很高兴为你服务！请问有什么我可以帮助你的吗？</p>
-                        <div class="mt-4 text-left bg-blue-50 rounded-xl p-4">
-                            <p class="text-sm text-gray-700 mb-2"><span class="font-semibold">💡 我可以帮你解答问题、提供建议</span></p>
-                            <p class="text-sm text-gray-600 mb-2"><span class="font-semibold">🔍 搜索最新信息和资讯</span></p>
-                            <p class="text-sm text-gray-600 mb-2"><span class="font-semibold">📝 提供创意和灵感</span></p>
-                            <p class="text-sm text-gray-600"><span class="font-semibold">💬 陪你聊天交流</span></p>
-                        </div>
-                    </div>
-                </div>
-            `;
-            messageInput.value = '';
-            sendBtn.disabled = true;
-            loadThreads();
-        }
-
-        // 加载会话列表（优先使用本地存储）
-        async function loadThreads() {
-            try {
-                // 先从本地存储获取会话
-                const localThreads = getThreads();
-                
-                // 如果本地有会话，先显示本地会话
-                if (localThreads.length > 0) {
-                    renderThreads(localThreads);
-                }
-                
-                // 同时从服务器获取会话作为补充
-                const response = await fetch('https://web-production-2ad77.up.railway.app/api/v1/chat/threads');
-                const data = await response.json();
-                
-                // 合并服务器会话到本地存储
-                const serverThreads = data.threads || [];
-                serverThreads.forEach(serverThread => {
-                    const existing = localThreads.find(t => t.thread_id === serverThread.thread_id);
-                    if (!existing) {
-                        saveThread(serverThread.thread_id, serverThread.title || '未命名会话');
-                    }
-                });
-                
-                // 重新渲染（包含合并后的会话）
-                renderThreads(getThreads());
-            } catch (error) {
-                console.error('加载会话列表失败:', error);
-                // 如果网络失败，使用本地存储
-                renderThreads(getThreads());
-            }
+        // 删除会话
+        function deleteThreadFromStorage(threadId) {
+            let threads = JSON.parse(localStorage.getItem('chat_threads') || '[]');
+            threads = threads.filter(t => t.thread_id !== threadId);
+            localStorage.setItem('chat_threads', JSON.stringify(threads));
         }
 
         // 渲染会话列表
@@ -225,37 +151,47 @@
             divider.className = 'h-px bg-gray-200 my-2';
             threadsList.appendChild(divider);
 
-            // 过滤空对话（标题为"新对话"的视为空对话）
-            const filteredThreads = threads.filter(thread => thread.title !== '新对话');
-            
-            // 添加历史会话
-            filteredThreads.forEach(thread => {
+            // 添加历史会话（只显示有内容的会话）
+            threads.forEach(thread => {
                 const threadItem = document.createElement('div');
-                threadItem.className = `p-3 mb-2 rounded-xl cursor-pointer transition-colors flex items-center gap-3 ${currentThreadId === thread.thread_id ? 'bg-orange-100 border-2 border-orange-300' : 'bg-gray-50 hover:bg-gray-100'}`;
+                threadItem.className = `p-3 mb-2 rounded-xl cursor-pointer transition-colors flex items-center gap-3 ${
+                    currentThreadId === thread.thread_id 
+                        ? 'bg-orange-100 border-2 border-orange-300' 
+                        : 'bg-gray-50 hover:bg-gray-100'
+                }`;
                 threadItem.innerHTML = `
                     <div class="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-lg flex items-center justify-center">
                         <span class="material-icons text-white text-sm">message</span>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="font-medium text-gray-800 truncate">${thread.title}</p>
+                        <p class="font-medium text-gray-800 truncate">${escapeHtml(thread.title)}</p>
                         <p class="text-xs text-gray-500">${formatDate(thread.created_at)}</p>
                     </div>
                     <button class="delete-thread-btn p-1 text-gray-400 hover:text-red-500 transition-colors" data-thread-id="${thread.thread_id}" title="删除会话">
                         <span class="material-icons text-xs">delete</span>
                     </button>
                 `;
-                threadItem.addEventListener('click', () => switchThread(thread.thread_id, thread.title));
+                threadItem.addEventListener('click', (e) => {
+                    if (!e.target.classList.contains('delete-thread-btn')) {
+                        switchThread(thread.thread_id, thread.title);
+                    }
+                });
+                threadItem.querySelector('.delete-thread-btn').addEventListener('click', () => {
+                    deleteThread(thread.thread_id);
+                });
                 threadsList.appendChild(threadItem);
             });
+        }
 
-            // 添加删除会话事件
-            document.querySelectorAll('.delete-thread-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const threadId = btn.dataset.threadId;
-                    deleteThread(threadId);
-                });
-            });
+        // 加载会话列表
+        async function loadThreads() {
+            try {
+                // 从本地存储获取会话
+                const localThreads = getThreads();
+                renderThreads(localThreads);
+            } catch (error) {
+                console.error('加载会话列表失败:', error);
+            }
         }
 
         // 切换会话
@@ -265,36 +201,25 @@
             
             // 加载历史消息
             try {
-                const response = await fetch(`https://web-production-2ad77.up.railway.app/api/v1/chat/messages?thread_id=${threadId}`);
+                const response = await fetch(`${API_BASE_URL}/v1/chat/messages?thread_id=${threadId}`);
                 const data = await response.json();
                 messagesContainer.innerHTML = '';
+                
                 // 如果没有历史消息，显示欢迎界面
-                if (data.messages.length === 0) {
-                    messagesContainer.innerHTML = `
-                        <div class="flex justify-center py-8">
-                            <div class="text-center max-w-md">
-                                <div class="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center">
-                                    <span class="material-icons text-white text-3xl">smart_toy</span>
-                                </div>
-                                <h3 class="text-xl font-semibold text-gray-800 mb-2">你好呀！我是你的 AI 私人助手</h3>
-                                <p class="text-gray-600">很高兴为你服务！请问有什么我可以帮助你的吗？</p>
-                            </div>
-                        </div>
-                    `;
+                if (!data.messages || data.messages.length === 0) {
+                    showWelcomeScreen();
                 } else {
+                    // 显示历史消息
                     data.messages.forEach(msg => {
-                        addMessage(msg.role, msg.content);
+                        addMessage(msg.role, msg.content, false);
                     });
                 }
             } catch (error) {
                 console.error('加载历史消息失败:', error);
+                showWelcomeScreen();
             }
             
-            // 更新选中状态
-            document.querySelectorAll('#threads-list > div').forEach(item => {
-                item.classList.remove('bg-orange-100', 'border-2', 'border-orange-300');
-                item.classList.add('bg-gray-50');
-            });
+            // 重新渲染会话列表（更新选中状态）
             loadThreads();
         }
 
@@ -304,14 +229,12 @@
             
             try {
                 // 从服务器删除
-                await fetch(`/api/v1/chat/messages?thread_id=${threadId}`, {
+                await fetch(`${API_BASE_URL}/v1/chat/messages?thread_id=${threadId}`, {
                     method: 'DELETE'
                 });
                 
                 // 从本地存储删除
-                let threads = getThreads();
-                threads = threads.filter(t => t.thread_id !== threadId);
-                localStorage.setItem('chat_threads', JSON.stringify(threads));
+                deleteThreadFromStorage(threadId);
                 
                 // 如果删除的是当前会话，创建新会话
                 if (currentThreadId === threadId) {
@@ -324,25 +247,40 @@
             }
         }
 
-        // 格式化日期
-        function formatDate(dateString) {
-            if (!dateString) return '未知';
-            const date = new Date(dateString);
-            const now = new Date();
-            const diff = now - date;
-            const minutes = Math.floor(diff / 60000);
-            const hours = Math.floor(diff / 3600000);
-            const days = Math.floor(diff / 86400000);
-            
-            if (minutes < 1) return '刚刚';
-            if (minutes < 60) return `${minutes}分钟前`;
-            if (hours < 24) return `${hours}小时前`;
-            if (days < 7) return `${days}天前`;
-            return date.toLocaleDateString('zh-CN');
+        // 显示欢迎界面
+        function showWelcomeScreen() {
+            messagesContainer.innerHTML = `
+                <div class="flex justify-center py-8">
+                    <div class="text-center max-w-md">
+                        <div class="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center">
+                            <span class="material-icons text-white text-3xl">smart_toy</span>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">你好呀！我是你的 AI 私人助手</h3>
+                        <p class="text-gray-600">很高兴为你服务！请问有什么我可以帮助你的吗？</p>
+                        <div class="mt-4 text-left bg-blue-50 rounded-xl p-4">
+                            <p class="text-sm text-gray-700 mb-2"><span class="font-semibold">💡 我可以帮你解答问题、提供建议</span></p>
+                            <p class="text-sm text-gray-600 mb-2"><span class="font-semibold">🔍 搜索最新信息和资讯</span></p>
+                            <p class="text-sm text-gray-600 mb-2"><span class="font-semibold">📝 提供创意和灵感</span></p>
+                            <p class="text-sm text-gray-600"><span class="font-semibold">💬 陪你聊天交流</span></p>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
-        // 添加消息
-        function addMessage(role, content) {
+        // 创建新会话
+        function createNewThread() {
+            currentThreadId = generateThreadId();
+            currentThreadTitle.textContent = '新对话';
+            showWelcomeScreen();
+            messageInput.value = '';
+            sendBtn.disabled = true;
+            // 注意：不保存到 localStorage，只有发送消息后才保存
+            loadThreads();
+        }
+
+        // 添加消息到界面
+        function addMessage(role, content, scroll = true) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `flex gap-3 ${role === 'user' ? 'flex-row-reverse' : ''}`;
             messageDiv.innerHTML = `
@@ -351,7 +289,9 @@
                         ? 'bg-gradient-to-br from-blue-500 to-indigo-600' 
                         : 'bg-gradient-to-br from-blue-500 to-indigo-600'
                 }">
-                    <span class="material-icons text-white text-sm">${role === 'user' ? 'person' : 'smart_toy'}</span>
+                    <span class="material-icons text-white text-sm">${
+                        role === 'user' ? 'person' : 'smart_toy'
+                    }</span>
                 </div>
                 <div class="max-w-[70%]">
                     <div class="px-4 py-3 rounded-2xl ${
@@ -364,11 +304,14 @@
                 </div>
             `;
             messagesContainer.appendChild(messageDiv);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            if (scroll) {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
         }
 
         // HTML 转义
         function escapeHtml(text) {
+            if (!text) return '';
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
@@ -407,12 +350,12 @@
             messagesContainer.appendChild(aiMessageContainer);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-            // 使用 querySelector 获取当前容器内的元素，避免 id 冲突
+            // 使用 querySelector 获取当前容器内的元素
             const aiResponseElement = aiMessageContainer.querySelector('.ai-response-content');
             const loadingIndicator = aiMessageContainer.querySelector('.loading-indicator');
 
             try {
-                const response = await fetch('https://web-production-2ad77.up.railway.app/api/v1/chat/stream', {
+                const response = await fetch(`${API_BASE_URL}/v1/chat/stream`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -444,10 +387,15 @@
                 // 移除加载指示器
                 loadingIndicator.remove();
                 
-                // 如果是第一条消息，更新会话标题
-                const messages = document.querySelectorAll('#messages-container > div');
-                if (messages.length === 2) { // 用户消息 + AI 回复
-                    updateThreadTitle(currentThreadId, message);
+                // 保存会话到 localStorage（第一次发送消息时）
+                const threads = getThreads();
+                const existingThread = threads.find(t => t.thread_id === currentThreadId);
+                
+                if (!existingThread) {
+                    // 第一次发送消息，保存会话并更新标题
+                    const title = message.length > 30 ? message.substring(0, 30) + '...' : message;
+                    currentThreadTitle.textContent = title;
+                    saveThread(currentThreadId, title);
                 } else {
                     // 更新会话时间
                     saveThread(currentThreadId, currentThreadTitle.textContent);
@@ -462,12 +410,29 @@
             }
         }
 
+        // 格式化日期
+        function formatDate(dateString) {
+            if (!dateString) return '刚刚';
+            const date = new Date(dateString);
+            const now = new Date();
+            const diff = now - date;
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+            
+            if (minutes < 1) return '刚刚';
+            if (minutes < 60) return `${minutes}分钟前`;
+            if (hours < 24) return `${hours}小时前`;
+            if (days < 7) return `${days}天前`;
+            return date.toLocaleDateString('zh-CN');
+        }
+
         // 事件监听
         messageInput.addEventListener('input', () => {
             sendBtn.disabled = !messageInput.value.trim();
         });
 
-        messageInput.addEventListener('keydown', (e) => {
+        messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 sendMessage();
@@ -475,10 +440,16 @@
         });
 
         sendBtn.addEventListener('click', sendMessage);
+
         newChatBtn.addEventListener('click', createNewThread);
+
         clearChatBtn.addEventListener('click', () => {
-            if (currentThreadId) {
-                deleteThread(currentThreadId);
+            if (currentThreadId && confirm('确定要清空当前会话吗？')) {
+                fetch(`${API_BASE_URL}/v1/chat/messages?thread_id=${currentThreadId}`, {
+                    method: 'DELETE'
+                }).then(() => {
+                    createNewThread();
+                });
             }
         });
 
@@ -486,13 +457,20 @@
             fileInput.click();
         });
 
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                console.log('选择的文件:', file.name);
+            }
+        });
+
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
-            // 先加载会话列表
+            // 加载会话列表
             loadThreads();
             
-            // 检查是否有历史会话（非空对话）
-            const threads = getThreads().filter(t => t.title !== '新对话');
+            // 检查是否有历史会话
+            const threads = getThreads();
             
             if (threads.length > 0) {
                 // 加载最新的会话

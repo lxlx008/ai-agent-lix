@@ -4,7 +4,7 @@ import sqlite3
 from dotenv import load_dotenv
 from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
-from langchain_core.messages import HumanMessage, AIMessageChunk
+from langchain_core.messages import HumanMessage, AIMessage, AIMessageChunk
 from langchain_tavily import TavilySearch
 from langgraph.checkpoint.sqlite import SqliteSaver
 
@@ -123,9 +123,24 @@ def search_recipes(prompt: str, image: str, thread_id: str):
                 {"type": "image", "url": image},
                 {"type": "text", "text": prompt}
             ])
+        
+        # 获取历史消息，保持对话上下文
+        history_messages = get_message(thread_id)
+        
+        # 将历史消息转换为 HumanMessage/AIMessage 对象
+        messages = []
+        for msg in history_messages:
+            if msg["role"] == "user":
+                messages.append(HumanMessage(content=msg["content"]))
+            elif msg["role"] == "assistant":
+                messages.append(AIMessage(content=msg["content"]))
+        
+        # 添加新消息
+        messages.append(message)
+        
         # 调用agent
         for chunk, metadata in agent.stream(
-                {"messages": [message]},
+                {"messages": messages},
                 {"configurable": {"thread_id": thread_id}},
                 stream_mode="messages"
         ):

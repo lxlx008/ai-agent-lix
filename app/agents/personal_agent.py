@@ -148,13 +148,26 @@ def search_recipes(prompt: str, image: str, thread_id: str):
             logger.info(f"继续对话，历史消息数: {len(history_messages)}")
         
         # 调用 agent 流式响应
+        full_response = ""
         for chunk, metadata in agent.stream(
                 {"messages": messages},
                 config,
                 stream_mode="messages"
         ):
             if isinstance(chunk, AIMessageChunk) and chunk.content:
+                full_response += chunk.content
                 yield chunk.content
+        
+        # 手动保存消息到数据库（重要！）
+        try:
+            # 保存用户消息
+            checkpoint_data = {
+                "messages": messages + [AIMessage(content=full_response)]
+            }
+            checkpointer.put(config, checkpoint_data)
+            logger.info(f"消息已保存到数据库，thread_id: {thread_id}")
+        except Exception as save_error:
+            logger.error(f"保存消息失败：{str(save_error)}")
     except Exception as e:
         logger.error(f"\n[错误]:{str(e)}")
         # 提供更详细的错误信息
@@ -260,6 +273,7 @@ def get_message(thread_id: str)->list[dict[str, str]]:
             if isinstance(message, HumanMessage):
                 content = str(message.content)
                 result.append({"role": "user", "content": content})
+                
             elif isinstance(message, (AIMessageChunk, AIMessage)):
                 content = str(message.content)
                 result.append({"role": "assistant", "content": content})

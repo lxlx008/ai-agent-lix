@@ -1,11 +1,5 @@
 name = "ai-agent-lix"
-type = "pages"
-
 compatibility_date = "2026-05-18"
 
-[assets]
-directory = "./app/static"
-
-[build]
-command = ""
-publish = "app/static"
+[site]
+bucket = "./app/static"

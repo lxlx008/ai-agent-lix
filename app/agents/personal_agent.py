@@ -260,7 +260,7 @@ def get_message(thread_id: str)->list[dict[str, str]]:
             if isinstance(message, HumanMessage):
                 content = str(message.content)
                 result.append({"role": "user", "content": content})
-            elif isinstance(message, AIMessageChunk):
+            elif isinstance(message, (AIMessageChunk, AIMessage)):
                 content = str(message.content)
                 result.append({"role": "assistant", "content": content})
         

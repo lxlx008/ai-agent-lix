@@ -28,8 +28,9 @@ model = init_chat_model(
 )
 
 # checkpoint
-os.makedirs("./db", exist_ok=True)
-checkpointer = SqliteSaver(sqlite3.connect("./db/personal_agent.db", check_same_thread=False))
+db_path = os.path.join(os.path.dirname(__file__), "..", "db", "personal_agent.db")
+os.makedirs(os.path.dirname(db_path), exist_ok=True)
+checkpointer = SqliteSaver(sqlite3.connect(db_path, check_same_thread=False))
 
 # 建表
 checkpointer.setup()
@@ -147,27 +148,14 @@ def search_recipes(prompt: str, image: str, thread_id: str):
         else:
             logger.info(f"继续对话，历史消息数: {len(history_messages)}")
         
-        # 调用 agent 流式响应
-        full_response = ""
+        # 调用 agent 流式响应（stream_mode="messages" 会自动保存）
         for chunk, metadata in agent.stream(
                 {"messages": messages},
                 config,
                 stream_mode="messages"
         ):
             if isinstance(chunk, AIMessageChunk) and chunk.content:
-                full_response += chunk.content
                 yield chunk.content
-        
-        # 手动保存消息到数据库（重要！）
-        try:
-            # 保存用户消息
-            checkpoint_data = {
-                "messages": messages + [AIMessage(content=full_response)]
-            }
-            checkpointer.put(config, checkpoint_data)
-            logger.info(f"消息已保存到数据库，thread_id: {thread_id}")
-        except Exception as save_error:
-            logger.error(f"保存消息失败：{str(save_error)}")
     except Exception as e:
         logger.error(f"\n[错误]:{str(e)}")
         # 提供更详细的错误信息

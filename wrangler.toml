@@ -1,0 +1,8 @@
+name = "ai-agent-lix"
+type = "pages"
+
+compatibility_date = "2026-05-18"
+
+[build]
+command = ""
+publish = "app/static"

@@ -145,8 +145,7 @@
         function createNewThread() {
             currentThreadId = generateThreadId();
             currentThreadTitle.textContent = '新对话';
-            // 保存会话到本地存储
-            saveThread(currentThreadId, '新对话');
+            // 不保存到本地存储，只有发送消息后才保存
             messagesContainer.innerHTML = `
                 <div class="flex justify-center py-8">
                     <div class="text-center max-w-md">

@@ -140,6 +140,47 @@ def clear_messages(thread_id: str):
     logger.info(f"清空历史消息，thread_id:{thread_id}")
     checkpointer.delete_thread(thread_id)
 
+# 获取所有会话列表
+def get_all_threads()->list[dict[str, str]]:
+    """获取所有会话列表"""
+    logger.info("获取所有会话列表")
+    
+    # 使用 SQLite 直接查询所有线程
+    conn = sqlite3.connect("./db/personal_agent.db", check_same_thread=False)
+    cursor = conn.cursor()
+    
+    try:
+        # 查询所有线程
+        cursor.execute("SELECT thread_id, created_at FROM checkpoints ORDER BY created_at DESC")
+        rows = cursor.fetchall()
+        
+        result = []
+        for row in rows:
+            thread_id = row[0]
+            created_at = row[1]
+            
+            # 获取会话的第一条消息作为标题
+            messages = get_message(thread_id)
+            if messages:
+                first_message = messages[0].get("content", "")
+                # 截取前30个字符作为标题
+                title = first_message[:30] + "..." if len(first_message) > 30 else first_message
+            else:
+                title = "空会话"
+            
+            result.append({
+                "thread_id": thread_id,
+                "title": title,
+                "created_at": created_at
+            })
+        
+        return result
+    except Exception as e:
+        logger.error(f"获取会话列表失败: {str(e)}")
+        return []
+    finally:
+        conn.close()
+
 # 查询历史会话
 def get_message(thread_id: str)->list[dict[str, str]]:
     """<UNK>"""

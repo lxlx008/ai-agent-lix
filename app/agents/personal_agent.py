@@ -138,10 +138,19 @@ def search_recipes(prompt: str, image: str, thread_id: str):
         # 添加新消息
         messages.append(message)
         
-        # 调用agent
+        # 调用agent（使用 checkpointer 来保存状态）
+        config = {"configurable": {"thread_id": thread_id}}
+        
+        # 如果没有历史消息，使用新会话
+        if not history_messages:
+            logger.info("新会话，开始对话")
+        else:
+            logger.info(f"继续对话，历史消息数: {len(history_messages)}")
+        
+        # 调用 agent 流式响应
         for chunk, metadata in agent.stream(
                 {"messages": messages},
-                {"configurable": {"thread_id": thread_id}},
+                config,
                 stream_mode="messages"
         ):
             if isinstance(chunk, AIMessageChunk) and chunk.content:

@@ -110,10 +110,43 @@
             return 'thread_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         }
 
+        // 保存会话到本地存储
+        function saveThread(threadId, title) {
+            let threads = JSON.parse(localStorage.getItem('chat_threads') || '[]');
+            const existingIndex = threads.findIndex(t => t.thread_id === threadId);
+            if (existingIndex >= 0) {
+                threads[existingIndex].title = title;
+                threads[existingIndex].updated_at = Date.now();
+            } else {
+                threads.unshift({
+                    thread_id: threadId,
+                    title: title,
+                    created_at: Date.now(),
+                    updated_at: Date.now()
+                });
+            }
+            localStorage.setItem('chat_threads', JSON.stringify(threads));
+        }
+
+        // 获取所有会话
+        function getThreads() {
+            return JSON.parse(localStorage.getItem('chat_threads') || '[]');
+        }
+
+        // 更新会话标题（根据第一条消息）
+        function updateThreadTitle(threadId, firstMessage) {
+            const title = firstMessage.length > 30 ? firstMessage.substring(0, 30) + '...' : firstMessage;
+            currentThreadTitle.textContent = title;
+            saveThread(threadId, title);
+            loadThreads();
+        }
+
         // 创建新会话
         function createNewThread() {
             currentThreadId = generateThreadId();
             currentThreadTitle.textContent = '新对话';
+            // 保存会话到本地存储
+            saveThread(currentThreadId, '新对话');
             messagesContainer.innerHTML = `
                 <div class="flex justify-center py-8">
                     <div class="text-center max-w-md">
@@ -136,14 +169,36 @@
             loadThreads();
         }
 
-        // 加载会话列表
+        // 加载会话列表（优先使用本地存储）
         async function loadThreads() {
             try {
+                // 先从本地存储获取会话
+                const localThreads = getThreads();
+                
+                // 如果本地有会话，先显示本地会话
+                if (localThreads.length > 0) {
+                    renderThreads(localThreads);
+                }
+                
+                // 同时从服务器获取会话作为补充
                 const response = await fetch('/api/v1/chat/threads');
                 const data = await response.json();
-                renderThreads(data.threads);
+                
+                // 合并服务器会话到本地存储
+                const serverThreads = data.threads || [];
+                serverThreads.forEach(serverThread => {
+                    const existing = localThreads.find(t => t.thread_id === serverThread.thread_id);
+                    if (!existing) {
+                        saveThread(serverThread.thread_id, serverThread.title || '未命名会话');
+                    }
+                });
+                
+                // 重新渲染（包含合并后的会话）
+                renderThreads(getThreads());
             } catch (error) {
                 console.error('加载会话列表失败:', error);
+                // 如果网络失败，使用本地存储
+                renderThreads(getThreads());
             }
         }
 
@@ -231,9 +286,15 @@
             if (!confirm('确定要删除这个会话吗？')) return;
             
             try {
+                // 从服务器删除
                 await fetch(`/api/v1/chat/messages?thread_id=${threadId}`, {
                     method: 'DELETE'
                 });
+                
+                // 从本地存储删除
+                let threads = getThreads();
+                threads = threads.filter(t => t.thread_id !== threadId);
+                localStorage.setItem('chat_threads', JSON.stringify(threads));
                 
                 // 如果删除的是当前会话，创建新会话
                 if (currentThreadId === threadId) {
@@ -365,7 +426,16 @@
                 // 移除加载指示器
                 loadingIndicator.remove();
                 
-                // 更新会话列表标题
+                // 如果是第一条消息，更新会话标题
+                const messages = document.querySelectorAll('#messages-container > div');
+                if (messages.length === 2) { // 用户消息 + AI 回复
+                    updateThreadTitle(currentThreadId, message);
+                } else {
+                    // 更新会话时间
+                    saveThread(currentThreadId, currentThreadTitle.textContent);
+                }
+                
+                // 更新会话列表
                 loadThreads();
             } catch (error) {
                 console.error('发送消息失败:', error);

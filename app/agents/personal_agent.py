@@ -150,29 +150,35 @@ def get_all_threads()->list[dict[str, str]]:
     cursor = conn.cursor()
     
     try:
-        # 查询所有线程
-        cursor.execute("SELECT thread_id, created_at FROM checkpoints ORDER BY created_at DESC")
+        # 查询所有线程（支持不同的表结构）
+        cursor.execute("SELECT key, value FROM checkpoints ORDER BY rowid DESC")
         rows = cursor.fetchall()
         
         result = []
+        seen_threads = set()
+        
         for row in rows:
-            thread_id = row[0]
-            created_at = row[1]
-            
-            # 获取会话的第一条消息作为标题
-            messages = get_message(thread_id)
-            if messages:
-                first_message = messages[0].get("content", "")
-                # 截取前30个字符作为标题
-                title = first_message[:30] + "..." if len(first_message) > 30 else first_message
-            else:
-                title = "空会话"
-            
-            result.append({
-                "thread_id": thread_id,
-                "title": title,
-                "created_at": created_at
-            })
+            key = row[0]
+            # 解析 thread_id
+            if key.startswith("configurable/"):
+                thread_id = key.replace("configurable/", "")
+                if thread_id not in seen_threads:
+                    seen_threads.add(thread_id)
+                    
+                    # 获取会话的第一条消息作为标题
+                    messages = get_message(thread_id)
+                    if messages:
+                        first_message = str(messages[0].get("content", ""))
+                        # 截取前30个字符作为标题
+                        title = first_message[:30] + "..." if len(first_message) > 30 else first_message
+                    else:
+                        title = "空会话"
+                    
+                    result.append({
+                        "thread_id": thread_id,
+                        "title": title,
+                        "created_at": ""
+                    })
         
         return result
     except Exception as e:
@@ -183,34 +189,51 @@ def get_all_threads()->list[dict[str, str]]:
 
 # 查询历史会话
 def get_message(thread_id: str)->list[dict[str, str]]:
-    """<UNK>"""
+    """获取历史消息"""
     logger.info(f"获取历史消息:{thread_id}")
 
-    # 根据thread_id 查询 checkpoint
-    checkpoint=checkpointer.get({"configurable": {"thread_id": thread_id}})
+    try:
+        # 根据thread_id 查询 checkpoint
+        checkpoint=checkpointer.get({"configurable": {"thread_id": thread_id}})
 
-    # 如果不存在。返回空列表
-    if not checkpoint:
+        # 如果不存在。返回空列表
+        if not checkpoint:
+            logger.info("checkpoint 不存在")
+            return []
+
+        # 正确获取 messages（LangGraph 0.2+ 的格式）
+        messages = []
+        if isinstance(checkpoint, dict):
+            channel_values = checkpoint.get("channel_values")
+            if channel_values and isinstance(channel_values, dict):
+                messages = channel_values.get("messages", [])
+        
+        # 如果不是预期格式，尝试其他方式
+        if not messages and hasattr(checkpoint, '__getitem__'):
+            try:
+                messages = checkpoint["channel_values"].get("messages", [])
+            except:
+                pass
+
+        if not messages:
+            logger.info("messages 为空")
+            return []
+
+        # 转换消息格式
+        result = []
+        for message in messages:
+            if not hasattr(message, 'content') or not message.content:
+                continue
+
+            if isinstance(message, HumanMessage):
+                content = str(message.content)
+                result.append({"role": "user", "content": content})
+            elif isinstance(message, AIMessageChunk):
+                content = str(message.content)
+                result.append({"role": "assistant", "content": content})
+        
+        return result
+    except Exception as e:
+        logger.error(f"获取历史消息失败: {str(e)}")
         return []
-
-    # 安全获取 messages
-    channel_values= checkpoint.get({"channel_values"})
-    if not channel_values:
-        return []
-    messages = channel_values.get("messages","")
-    if not messages:
-        return []
-
-    # 转换消息格式
-    result = []
-    for message in messages:
-        if not message.content:
-            continue
-
-        if isinstance(message,HumanMessage):
-            result.append({"role":"user","content":message.content})
-        elif isinstance(message,AIMessageChunk):
-            result.append({"role":"assistant","content":message.content})
-
-    return result
 

@@ -1,5 +1,0 @@
-name = "ai-agent-lix"
-compatibility_date = "2026-05-18"
-
-[site]
-bucket = "./app/static"

@@ -179,7 +179,7 @@ def get_all_threads()->list[dict[str, str]]:
     logger.info("获取所有会话列表")
     
     # 使用 SQLite 直接查询所有线程
-    conn = sqlite3.connect("./db/personal_agent.db", check_same_thread=False)
+    conn = sqlite3.connect(db_path, check_same_thread=False)
     cursor = conn.cursor()
     
     try:
@@ -198,20 +198,24 @@ def get_all_threads()->list[dict[str, str]]:
                 if thread_id not in seen_threads:
                     seen_threads.add(thread_id)
                     
-                    # 获取会话的第一条消息作为标题
+                    # 获取该线程的消息
                     messages = get_message(thread_id)
-                    if messages:
-                        first_message = str(messages[0].get("content", ""))
-                        # 截取前30个字符作为标题
-                        title = first_message[:30] + "..." if len(first_message) > 30 else first_message
-                    else:
-                        title = "空会话"
                     
-                    result.append({
-                        "thread_id": thread_id,
-                        "title": title,
-                        "created_at": ""
-                    })
+                    # 只有当线程有实际消息时才添加到结果中
+                    if messages and len(messages) > 0:
+                        # 查找第一条用户消息作为标题
+                        title = "新对话"
+                        for msg in messages:
+                            if msg.get("role") == "user":
+                                first_message = str(msg.get("content", ""))
+                                title = first_message[:30] + "..." if len(first_message) > 30 else first_message
+                                break
+                        
+                        result.append({
+                            "thread_id": thread_id,
+                            "title": title,
+                            "created_at": ""
+                        })
         
         return result
     except Exception as e:

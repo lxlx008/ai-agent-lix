@@ -226,8 +226,11 @@
             divider.className = 'h-px bg-gray-200 my-2';
             threadsList.appendChild(divider);
 
+            // 过滤空对话（标题为"新对话"的视为空对话）
+            const filteredThreads = threads.filter(thread => thread.title !== '新对话');
+            
             // 添加历史会话
-            threads.forEach(thread => {
+            filteredThreads.forEach(thread => {
                 const threadItem = document.createElement('div');
                 threadItem.className = `p-3 mb-2 rounded-xl cursor-pointer transition-colors flex items-center gap-3 ${currentThreadId === thread.thread_id ? 'bg-orange-100 border-2 border-orange-300' : 'bg-gray-50 hover:bg-gray-100'}`;
                 threadItem.innerHTML = `
@@ -470,8 +473,20 @@
 
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
-            // 创建初始会话
-            if (!currentThreadId) {
+            // 先加载会话列表
+            loadThreads();
+            
+            // 检查是否有历史会话（非空对话）
+            const threads = getThreads().filter(t => t.title !== '新对话');
+            
+            if (threads.length > 0) {
+                // 加载最新的会话
+                const latestThread = threads.reduce((latest, t) => 
+                    t.updated_at > latest.updated_at ? t : latest
+                );
+                switchThread(latestThread.thread_id, latestThread.title);
+            } else {
+                // 没有历史会话，创建新会话
                 createNewThread();
             }
         });

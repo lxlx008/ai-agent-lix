@@ -12,10 +12,10 @@ async def chat_endpoint(request: ChatRequest):
     """流式对话"""
     def stream_generator():
         for chunk in search_recipes(request.message, request.image_url, request.thread_id):
-            # 输出正确的 SSE 格式
-            yield f"data: {chunk}\n\n"
+            # 直接输出纯文本，不添加 SSE 格式
+            yield chunk
     
-    return StreamingResponse(stream_generator(), media_type="text/event-stream")
+    return StreamingResponse(stream_generator(), media_type="text/plain")
 
 
 @router.get("/chat/messages")

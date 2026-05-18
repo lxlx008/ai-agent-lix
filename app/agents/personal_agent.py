@@ -264,7 +264,8 @@ def get_message(thread_id: str)->list[dict[str, str]]:
                 content = str(message.content)
                 result.append({"role": "assistant", "content": content})
         
-        return result
+        # 反转消息顺序，确保最新的消息在最后
+        return result[::-1]
     except Exception as e:
         logger.error(f"获取历史消息失败: {str(e)}")
         return []
